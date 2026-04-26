@@ -1,0 +1,69 @@
+name: Github CI/CD pipeline - vebsite
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  ci:
+    name: Validate HTML & CSS
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Repo-nu götür
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      # HTML yoxlama (lint)
+      - name: Validate HTML
+        run: |
+          npm install -g htmlhint
+          htmlhint index.html
+
+      # CSS yoxlama və avtomatik düzəltmə
+      - name: Validate & Fix CSS
+        run: |
+          npm install -g stylelint stylelint-config-standard
+          echo '{
+            "extends": "stylelint-config-standard",
+            "rules": {
+              "comment-empty-line-before": null,
+              "rule-empty-line-before": null,
+              "color-function-alias-notation": null,
+              "color-function-notation": null,
+              "alpha-value-notation": null,
+              "function-url-quotes": null
+            }
+          }' > .stylelintrc.json
+          stylelint style.css
+
+      # Artifact kimi saxla
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: .
+
+  cd:
+    name: Deploy Website
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      # Repo-nu götür
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      # Build step (frontend üçün sadəcə copy)
+      - name: Prepare build folder
+        run: |
+          mkdir -p build
+          cp index.html build/
+          cp style.css build/
+
+      # Deploy (GitHub Pages)
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
